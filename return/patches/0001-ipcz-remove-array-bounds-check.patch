@@ -1,0 +1,12 @@
+--- a/third_party/ipcz/src/ipcz/message.cc
++++ b/third_party/ipcz/src/ipcz/message.cc
+@@ -93,8 +93,7 @@
+   }
+ 
+   auto& header = *reinterpret_cast<internal::ArrayHeader*>(&data[array_offset]);
+-  if (bytes_available < header.num_bytes ||
+-      header.num_bytes < sizeof(internal::ArrayHeader)) {
++  if (header.num_bytes < sizeof(internal::ArrayHeader)) {
+     return false;
+   }
+ 

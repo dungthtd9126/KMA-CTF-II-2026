@@ -1,0 +1,9 @@
+services:
+  quiet-ledger:
+    build:
+      context: .
+      args:
+        FLAG: "FLAG{quiet_ledger_sample_flag}"
+    ports:
+      - "31337:31337"
+    restart: unless-stopped

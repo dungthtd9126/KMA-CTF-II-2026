@@ -1,0 +1,85 @@
+schema_version: "1.0"
+challenge_id: "the-cube-lost-its-memory-twice"
+challenge_name: "The Cube Lost Its Memory Twice"
+slug: "the-cube-lost-its-memory-twice"
+category: "web"
+event: "KMA CTF II 2026"
+year: 2026
+date_solved: "2026-09-12"
+status: "solved"
+memory_mode: "normal"
+solution_reuse: false
+split: "unassigned"
+
+artifact:
+  architecture: "browser JavaScript client"
+  os: "unknown"
+  hashes: []
+  files:
+    - "solve.py"
+    - "solve.md"
+
+runtime:
+  libc: null
+  loader: null
+  kernel: null
+  interpreter: "browser JavaScript"
+  framework: "React 19.3.0 client bundle"
+  versions:
+    - "React 19.3.0"
+
+mitigations:
+  - "server-authoritative cube-state check"
+  - "short-lived Stage 1 pass token"
+constraints:
+  - "Stage 1: 2x2x2, 60-second deadline"
+  - "Stage 2: 3x3x3, 180-second deadline"
+  - "approximately 3-second queue before moves are accepted"
+vulnerabilities:
+  - "complete scramble disclosure in the start response"
+  - "client-controlled reversible move list"
+initial_primitives:
+  - "start response exposes scramble and run timing"
+derived_primitives:
+  - "inverse scramble move sequence"
+  - "Stage 1 pass token"
+techniques:
+  - "web-reversible-state-from-start-response"
+concepts:
+  - "client-visible deterministic puzzle state"
+failures:
+  - "web-short-lived-run-expiry"
+heuristics:
+  - "automate staged start-to-finish requests"
+
+targets:
+  - "http://42.112.213.93:18081/"
+goal: "Obtain the flag by passing both server-verified cube stages"
+exploit_chain:
+  - "POST Stage 1 start"
+  - "read and invert returned scramble"
+  - "finish Stage 1"
+  - "start Stage 2 with the returned pass token"
+  - "read and invert the second scramble"
+  - "finish Stage 2"
+
+research_sources: []
+retrieval_cues:
+  - "web CTF"
+  - "Rubik cube"
+  - "start response contains scramble"
+  - "finish endpoint accepts moves"
+  - "reversible state"
+negative_cues:
+  - "hidden server state"
+  - "unknown move optimality check"
+  - "expired run or pass token"
+version_boundaries:
+  - "Verified against the provided 2026 service and observed face-move notation"
+near_duplicate_family: "reversible puzzle/protocol challenges"
+
+training_export:
+  eligible: "needs_review"
+  omit_flag: true
+  omit_secrets: true
+  omit_private_chain_of_thought: true

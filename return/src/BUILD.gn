@@ -1,0 +1,47 @@
+import("//mojo/public/tools/bindings/mojom.gni")
+
+# CTF challenge: Mojo IPC sandbox escape.
+#
+# Build from the Chromium source root:
+#   gn gen out/ctf --args='is_debug=false symbol_level=1 is_component_build=false'
+#   ninja -C out/ctf ctf
+
+mojom("mojom") {
+  sources = [ "ctf.mojom" ]
+}
+
+executable("broker") {
+  sources = [ "broker.cc" ]
+  deps = [
+    ":mojom",
+    "//base",
+    "//mojo/core/embedder",
+    "//mojo/public/cpp/platform",
+    "//mojo/public/cpp/system",
+  ]
+}
+
+config("no_stack_protector") {
+  cflags = [ "-fno-stack-protector" ]
+}
+
+executable("sandboxee") {
+  sources = [ "sandboxee.cc" ]
+  configs += [ ":no_stack_protector" ]
+  use_libcxx_modules = false
+  deps = [
+    ":mojom",
+    "//base",
+    "//mojo/core/embedder",
+    "//mojo/public/cpp/platform",
+    "//mojo/public/cpp/system",
+  ]
+}
+
+group("ctf") {
+  deps = [
+    ":broker",
+    ":sandboxee",
+    "//ctf_test:oob_read_test",
+  ]
+}

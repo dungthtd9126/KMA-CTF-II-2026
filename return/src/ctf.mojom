@@ -1,0 +1,79 @@
+module ctf.mojom;
+
+struct RegisterResult {
+
+  bool success;
+
+  string message;
+
+  array<uint8> token;
+};
+
+struct FileRequest {
+
+  array<uint8> token;
+
+  string filename;
+
+  uint32 size;
+
+  array<uint8> data;
+};
+
+enum FileError {
+  kOk = 0,
+
+  kBadToken,
+
+  kBadName,
+
+  kSizeMismatch,
+
+  kTooLarge,
+
+  kNotFound,
+
+  kExists,
+
+  kIoError,
+};
+
+struct FileResult {
+  FileError error;
+
+  string message;
+
+  array<uint8> data;
+};
+
+struct FolderResult {
+  FileError error;
+
+  string message;
+
+  pending_remote<Folder>? folder;
+};
+
+interface Folder {
+
+  [Sync]
+  CreateFolder(FileRequest request) => (FolderResult result);
+
+  [Sync]
+  WriteFile(FileRequest request) => (FileResult result);
+
+  [Sync]
+  ReadFile(FileRequest request) => (FileResult result);
+
+  [Sync]
+  DeleteFile(FileRequest request) => (FileResult result);
+};
+
+interface Registry {
+
+  [Sync]
+  Register(string username) => (RegisterResult result);
+
+  [Sync]
+  OpenRoot(array<uint8> token) => (FolderResult result);
+};

@@ -1,0 +1,14 @@
+--- a/third_party/ipcz/src/ipcz/parcel.cc
++++ b/third_party/ipcz/src/ipcz/parcel.cc
+@@ -45,8 +45,10 @@
+                           NodeLinkMemory* memory) {
+   ABSL_ASSERT(std::holds_alternative<std::monostate>(data_.storage));
+ 
++  constexpr bool kAllowSharedMemoryParcelData = false;
++
+   Fragment fragment;
+-  if (num_bytes > 0 && memory) {
++  if (kAllowSharedMemoryParcelData && num_bytes > 0 && memory) {
+     const size_t requested_fragment_size = num_bytes + sizeof(FragmentHeader);
+     if (allow_partial) {
+       fragment = memory->AllocateFragmentBestEffort(requested_fragment_size);

@@ -1,0 +1,10 @@
+services:
+  mail_service:
+    build: .
+    ports:
+      - "1337:1337"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
