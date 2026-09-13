@@ -1,5 +1,5 @@
 # KMA CTF II 2026
-## Binary exploit by kazuke
+## PWN / Binary exploit by kazuke
 Challenge này có 2 lỗi chính: OOB read và Buffer Overflow
 
 ### OOB read
@@ -130,7 +130,7 @@ s(load)
 ```
 ![alt text](./assets/image-3.png)
 
-## quiet
+## PWN / QUIET
 Challenge này cũng có 2 bug chính: Nối chuỗi %s và Buffer Overflow
 ### Nối chuỗi %s
 Challenge cho phép em edit `operator` (leak bin) và `auditor` (leak libc), mỗi cái em đều được edit tối đa `0x40` bytes:
@@ -273,3 +273,187 @@ io.vtable = libc.sym._IO_wfile_jumps+8
 io._lock = libc.sym._IO_stdfile_2_lock
 io._wide_data = exe.address +0x4490 # check later
 ```
+
+## MISC / R U Ready? 
+### Solve Explaination
+Challenge này là 1 web giải rubix, flag sẽ xuất hiện sau khi giải được 2 stage
+![alt text](./assets/rubix.png)
+
+Đối với từng stage thì em sẽ phải gửi 2 `POST`: `bắt đầu stage` và `gửi các moves để hoàn thành stage`
+
+Để gửi `POST` thì em sẽ có 1 function dùng để gửi request cùng với body ở dạng json và nhận lại response từ server 
+```py
+def post(path, body):
+    # This sends an HTTP POST request. And wait 15 seconds for server's response
+    response = requests.post(BASE_URL + path, json=body, timeout=15)
+    # check HTTP status code. If the server got error, raises an exception
+    response.raise_for_status()
+    # Converts the server's JSON response into Python objects.
+    return response.json()
+```
+Sau khi nhận respone thì nó sẽ có dạng như vầy:
+```py
+{'runId': 'a2006d9c-fa0f-42fe-8858-2880e4d5f1f5', 'stage': 1, 
+'puzzle': '2x2x2', 
+'scramble': "F U L2 F' U F2 R2 F' L2 F2 U'", 'serverNow': 1789303902668, 
+'startsAt': 1789303905668, 
+'deadlineAt': 1789303965668}
+```
+Theo như response show thì lần run hiện tại đang ở stage 1 và có thứ tự làm rối rubix 2x2x2 được ghi trong scramble
+
+Vì thế, để mà giải được cục này thì chỉ cần reverse lại order là sẽ pass được các stage
+
+Để mà reverse lại các move thì em sẽ có 1 hàm riêng cho việc này:
+```py
+def reverse_scramble(scramble):
+    result = []
+    for move in reversed(scramble.split()):
+        if move.endswith("'"):
+            move = move[:-1]       # R' -> R
+        elif not move.endswith("2"):
+            move += "'"             # R -> R'
+        # R2 stays R2. The reversed order is already handled above.
+        result.append(move)
+    print("-"*0x10)
+    print(f"After reverse the order:\n {result}")
+    print("-"*0x10)
+
+    return result
+```
+Hàm này hoạt động như cách giải rubix thông thường, sau khi đã biết được cách rubix đc xáo. Đối với các move như R thì phải làm ngược lại là R` và ngược lại. Riêng các move như L2, F2,... có ký tự cuối là 2 thì nó xoay 180 độ nên giữ nguyên move, lúc sau vẫn xài đúng move đó thì nó sẽ thành 360 độ.
+
+Từng move sẽ được cho vào 1 list là `result` sau khi phân biệt move đó là gì sau đó trả về `result`
+
+- Dưới đây là 1 example sau khi gửi `POST` start stage 1 và đảo ngược lại các move
+```c
+{'runId': 'a2006d9c-fa0f-42fe-8858-2880e4d5f1f5', 'stage': 1, 
+'puzzle': '2x2x2', 
+'scramble': "F U L2 F' U F2 R2 F' L2 F2 U'", 'serverNow': 1789303902668, 
+'startsAt': 1789303905668, 
+'deadlineAt': 1789303965668}
+----------------
+After reverse the order:
+ ['U', 'F2', 'L2', 'F', 'R2', 'F2', "U'", 'F', 'L2', "U'", "F'"]
+----------------
+```
+- So sánh rõ hơn các move mà server đã xáo và sau khi được reverse lại bằng `reverse_scramble`:
+```c
+// Server
+'scramble': "F U L2 F' U F2 R2 F' L2 F2 U'"
+// Local reversed
+['U', 'F2', 'L2', 'F', 'R2', 'F2', "U'", 'F', 'L2', "U'", "F'"]
+```
+Hàm thứ 3 của em sẽ là 1 hàm dùng để sử dụng cả 2 hàm trên:
+```py
+def solve_stage(stage, pass_token=None):
+    if pass_token is None:
+        start_body = {}
+    else:
+        start_body = {"stagePassToken": pass_token}
+    run = post(f"/api/stages/{stage}/start", start_body)
+
+    # The server queues the run before accepting moves.
+    wait = run["startsAt"] - run["serverNow"]
+    if wait < 0:
+        wait = 0
+    wait = wait / 1000 + 0.25
+    time.sleep(wait)
+    print(run)
+    result = post(
+        f"/api/stages/{stage}/finish",
+        {
+            "runId": run["runId"],
+            "moves": reverse_scramble(run["scramble"]),
+        },
+    )
+    print("-"*0x20)
+    print(f"Final result: {result}")
+    print("-"*0x20)
+
+    if not result.get("ok"):
+        raise RuntimeError(result)
+    return result
+```
+Đầu tiên là em sẽ phải gửi `POST` lên server để nó tạo id và stage đầu. Lúc này chưa có gì nên body sẽ là rỗng
+```py
+run = post(f"/api/stages/{stage}/start", start_body = {})
+```
+Sau khi nhận được phản hồi từ server thì sẽ có thông tin rồi mới bắt đầu bước reverse scramble và gửi lại cho server để solve từng stage
+
+```py
+result = post(
+  f"/api/stages/{stage}/finish",
+  {
+      "runId": run["runId"],
+      "moves": reverse_scramble(run["scramble"]),
+  },
+)
+```
+Vì server `queue run` nên là sẽ phải sleep script để chờ `run` được khởi tạo
+```py
+# miliseconds
+wait = run["startsAt"] - run["serverNow"]
+if wait < 0:
+    wait = 0
+# seconds
+wait = wait / 1000 + 0.25
+time.sleep(wait)
+```
+Sau khi bypass stage 1 thì nó sẽ trả về `stagePassToken`:
+```c
+Final result: {'ok': True, 
+'stage': 1, 
+'elapsedMs': 421, 
+'moveCount': 11, 
+'stagePassToken': 'eyJ0eXAiOiJzdGFnZS1wYXNzIiwic3RhZ2UiOjEsIm5vbmNlIjoiNGZjMjAwMzg2ZGQwNTEzYjVmMWQwNmM2YjAzZDBlZmYiLCJpYXQiOjE3ODkzMDM5MDYwODksImV4cCI6MTc4OTMwNDUwNjA4OX0.q77PatHi_aV24prr3kA6rdIWMq_aZmDeGVwUhcEp_Qo'}
+```
+
+Lúc này chỉ cần nhận response đó, send `POST` mới để khởi tạo `stage 2` và lặp lại bước giải rubix là sẽ có flag:
+```c
+stage1 = solve_stage(1)
+print("Stage 1 solved")
+stage2 = solve_stage(2, stage1["stagePassToken"])
+```
+
+- Sau khi win stage 2:
+
+```c
+Final result: {'ok': True, 'stage': 2, 'elapsedMs': 330, 'moveCount': 21, 'flag': 'KMACTF{tw1st_th3_cl0ck_b4ck}'}
+```
+> Flag: KMACTF{tw1st_th3_cl0ck_b4ck}
+
+### Bonus
+Sau khi tìm hiểu thêm về cách tìm và có được `API` để gửi server thì em học đc 1 tí về cách lấy được source js về r tìm `API`
+
+Đầu tiên, chỉ cần `ctrl+U` để view source của cái web:
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08111d" />
+    <meta name="description" content="R U Ready? KMA CTF Rubik challenge" />
+    <title>R U Ready? | KMA CTF</title>
+    <script type="module" crossorigin src="/assets/index-CO3YbkAX.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D-eGM6fd.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+```
+Từ đây, ta thấy là module được nối với 1 source khác. Lúc này có 2 option là `curl` trên terminal hoặc ấn thẳng link rồi tìm `/api` thì sẽ ra được cái API
+- Đối với terminal:
+```c
+curl -sS http://42.112.213.93:18081/assets/index-CO3YbkAX.js | grep `/api`
+```
+Lúc này, 2 API sẽ có dạng như vầy:
+```c
+/api/stages/${e}/start
+/api/stages/${e}/finish
+```
+
+![alt text](./assets/rubix1.png)
+
+> Và thế là em đã biết đc program có 2 cái API để gửi và nhận `response` từ server
