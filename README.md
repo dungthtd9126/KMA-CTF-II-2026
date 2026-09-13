@@ -456,4 +456,4 @@ Lúc này, 2 API sẽ có dạng như vầy:
 
 ![alt text](./assets/rubix1.png)
 
-> Và thế là em đã biết đc program có 2 cái API để gửi và nhận `response` từ server
+> **Và thế là em đã biết đc program có 2 cái API để gửi và nhận `response` từ server**
